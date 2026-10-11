@@ -1,6 +1,7 @@
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useChatContext } from '../context/ChatContext'
 import {
   ArrowUp,
   ChartNoAxesColumn,
@@ -33,49 +34,28 @@ const suggestions = [
 ]
 
 export default function ChatScreen() {
-  const [chats, setChats] = useState([
-    { id: 1, title: 'New Conversation', messages: [] },
-  ])
-  const [activeId, setActiveId] = useState(1)
+  const { messages, loading, error, sendMessage, clearChat } = useChatContext()
   const [message, setMessage] = useState('')
+  const messagesEndRef = useRef(null)
 
-  const activeChat = chats.find((chat) => chat.id === activeId)
-  const messages = activeChat?.messages ?? []
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+    })
+  }, [messages, loading])
 
-  const newChat = () => {
-    const id = Date.now()
-    setChats((previous) => [
-      { id, title: 'New Conversation', messages: [] },
-      ...previous,
-    ])
-    setActiveId(id)
+  const handleSend = (text = message) => {
+    const content = text.trim()
+
+    if (!content || loading) return
+
+    sendMessage(content)
     setMessage('')
   }
 
-  const sendMessage = (text = message) => {
-    const content = text.trim()
-    if (!content) return
-
-    setChats((previous) =>
-      previous.map((chat) =>
-        chat.id === activeId
-          ? {
-              ...chat,
-              title:
-                chat.messages.length === 0
-                  ? content.slice(0, 35)
-                  : chat.title,
-              messages: [
-                ...chat.messages,
-                { id: Date.now(), role: 'user', content },
-              ],
-            }
-          : chat
-      )
-    )
-
+  const handleNewChat = () => {
+    clearChat()
     setMessage('')
-    // Connect the Gemini/MCP chat API here when implemented.
   }
 
   return (
@@ -83,8 +63,11 @@ export default function ChatScreen() {
       <header className="flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-8">
         <div className="flex items-center gap-3">
           <MessageCircle className="text-violet-400" size={22} />
+
           <div>
-            <h1 className="font-semibold">AI Finance Assistant</h1>
+            <h1 className="font-semibold">
+              AI Finance Assistant
+            </h1>
             <p className="text-xs text-slate-400">
               Your personal money companion
             </p>
@@ -92,16 +75,19 @@ export default function ChatScreen() {
         </div>
 
         <button
-          onClick={newChat}
+          onClick={handleNewChat}
           className="flex cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-medium hover:bg-violet-500"
         >
           <Plus size={17} />
-          <span className="hidden sm:inline">New Chat</span>
+          <span className="hidden sm:inline">
+            New Chat
+          </span>
         </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-8">
         <div className="mx-auto max-w-3xl">
+
           {messages.length === 0 ? (
             <div className="pt-6 text-center sm:pt-14">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-600/20 text-violet-400">
@@ -111,6 +97,7 @@ export default function ChatScreen() {
               <h2 className="text-2xl font-bold sm:text-3xl">
                 Your money, made simple.
               </h2>
+
               <p className="mt-3 text-sm text-slate-400">
                 Ask questions about your finances or explore your dashboard.
               </p>
@@ -122,11 +109,19 @@ export default function ChatScreen() {
                   return (
                     <button
                       key={item.title}
-                      onClick={() => sendMessage(item.prompt)}
-                      className={`cursor-pointer rounded-2xl border border-white/10 bg-gradient-to-br ${item.color} p-4 text-left transition hover:border-violet-400/50`}
+                      onClick={() => handleSend(item.prompt)}
+                      disabled={loading}
+                      className={`cursor-pointer rounded-2xl border border-white/10 bg-gradient-to-br ${item.color} p-4 text-left transition hover:border-violet-400/50 disabled:opacity-50`}
                     >
-                      <Icon size={23} className="mb-4 text-violet-300" />
-                      <p className="font-semibold">{item.title}</p>
+                      <Icon
+                        size={23}
+                        className="mb-4 text-violet-300"
+                      />
+
+                      <p className="font-semibold">
+                        {item.title}
+                      </p>
+
                       <p className="mt-2 text-xs leading-5 text-slate-400">
                         {item.prompt}
                       </p>
@@ -147,14 +142,40 @@ export default function ChatScreen() {
               {messages.map((item) => (
                 <div
                   key={item.id}
-                  className="flex justify-end"
+                  className={`flex ${
+                    item.role === 'user'
+                      ? 'justify-end'
+                      : 'justify-start'
+                  }`}
                 >
-                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-violet-600 px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap ${
+                      item.role === 'user'
+                        ? 'rounded-br-md bg-violet-600 text-white'
+                        : 'rounded-bl-md border border-white/10 bg-slate-900 text-slate-100'
+                    }`}
+                  >
                     {item.content}
                   </div>
                 </div>
               ))}
+
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="animate-pulse rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-violet-400">
+                    MoneyMate is thinking...
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
+          )}
+
+          {error && (
+            <p className="mt-4 text-sm text-red-400">
+              {error}
+            </p>
           )}
         </div>
       </div>
@@ -163,7 +184,7 @@ export default function ChatScreen() {
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            sendMessage()
+            handleSend()
           }}
           className="mx-auto flex max-w-3xl items-end gap-3 rounded-2xl border border-white/10 bg-slate-900 p-3 focus-within:border-violet-500/60"
         >
@@ -171,26 +192,32 @@ export default function ChatScreen() {
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
                 event.preventDefault()
-                sendMessage()
+                handleSend()
               }
             }}
             rows={2}
             placeholder="Ask anything about your finances..."
             className="max-h-36 min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-slate-500"
           />
+
           <button
             type="submit"
-            disabled={!message.trim()}
+            disabled={loading || !message.trim()}
             className="cursor-pointer rounded-xl bg-violet-600 p-3 hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Send message"
           >
             <ArrowUp size={20} />
           </button>
         </form>
+
         <p className="mt-2 text-center text-xs text-slate-500">
-          Chat API integration is coming next.
+          Powered by Gemini
         </p>
       </div>
     </div>

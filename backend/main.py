@@ -8,6 +8,7 @@ from app.transaction_routes import router as transactions_router
 from app.summary_routes import router as summary_router
 from app.transfer_routes import router as transfers_router
 from app import models
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -21,6 +22,14 @@ app = FastAPI(
     description="API for managing personal expenses and bank accounts",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(accounts_router)

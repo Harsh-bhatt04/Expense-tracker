@@ -10,12 +10,14 @@ from app.transfer_routes import router as transfers_router
 from app.chat_routes.chat import router as chat_router
 from app import models
 from fastapi.middleware.cors import CORSMiddleware
+from app.ai.agent import agent_lifespan
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
+    async with agent_lifespan() as graph:
+        app.state.graph = graph
+        yield
 
 
 app = FastAPI(

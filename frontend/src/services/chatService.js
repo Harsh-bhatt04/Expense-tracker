@@ -18,3 +18,11 @@ export async function resumeChat(conversationId, approved) {
 
   return data
 }
+
+export async function getChatHistory(conversationId) {
+  const { data } = await api.get(
+    `/chat/history/${conversationId}`
+  );
+
+  return data;
+}

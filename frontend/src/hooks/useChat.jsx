@@ -1,14 +1,22 @@
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect} from 'react'
 import {
   sendChatMessage,
   resumeChat,
+  getChatHistory
 } from '../services/chatService'
 
 export default function useChat() {
-  const [conversationId, setConversationId] = useState(
-    () => crypto.randomUUID()
-  )
+  const [conversationId, setConversationId] = useState(() => {
+  const savedId = localStorage.getItem("moneymate_conversation_id");
+
+  if (savedId) return savedId;
+
+  const newId = crypto.randomUUID();
+  localStorage.setItem("moneymate_conversation_id", newId);
+
+  return newId;
+});
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -16,6 +24,41 @@ export default function useChat() {
 
   const conversationRef = useRef(conversationId)
   const busyRef = useRef(false)
+
+  useEffect(() => {
+  let cancelled = false;
+
+  async function restoreHistory() {
+    try {
+      const data = await getChatHistory(conversationId);
+
+      if (cancelled) return;
+
+      setMessages(
+        data.messages.map((message) => ({
+          id: crypto.randomUUID(),
+          role: message.role,
+          content: message.content,
+        }))
+      );
+
+      setPendingApproval(data.pending_approval ?? null);
+      setError(null);
+
+    } catch (error) {
+      if (!cancelled) {
+        console.error("Failed to restore chat:", error);
+        setError("Unable to restore conversation.");
+      }
+    }
+  }
+
+  restoreHistory();
+
+  return () => {
+    cancelled = true;
+  };
+}, [conversationId]);
 
   const appendAssistant = (content) => {
     setMessages((previous) => [
@@ -102,15 +145,15 @@ export default function useChat() {
   }
 
   const clearChat = () => {
-    if (busyRef.current) return
+  const newId = crypto.randomUUID();
 
-    const id = crypto.randomUUID()
-    conversationRef.current = id
-    setConversationId(id)
-    setMessages([])
-    setPendingApproval(null)
-    setError('')
-  }
+  localStorage.setItem("moneymate_conversation_id", newId);
+
+  setConversationId(newId);
+  setMessages([]);
+  setPendingApproval(null);
+  setError(null);
+};
 
   return {
     conversationId,

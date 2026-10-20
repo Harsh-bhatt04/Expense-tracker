@@ -4,6 +4,9 @@ import json
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import interrupt
+from typing import Annotated, Literal
+from langchain_core.tools import tool, InjectedToolCallId
+
 
 from langchain_core.messages import (
     AIMessage,
@@ -20,13 +23,45 @@ WRITE_TOOLS = {"add_transaction"}
 class MoneyMateState(MessagesState):
     approved: bool | None
 
+def make_transaction_tool(mcp_tool):
+    @tool("add_transaction")
+    async def approved_add_transaction(
+        account_id: int,
+        transaction_type: Literal["expense", "income"],
+        amount: str,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        category: str = "Other",
+        description: str = "",
+        transaction_date: str | None = None,
+    ) -> dict:
+        """Create an expense or income transaction after user approval."""
+
+        return await mcp_tool.ainvoke({
+            "account_id": account_id,
+            "transaction_type": transaction_type,
+            "amount": amount,
+            "category": category,
+            "description": description,
+            "transaction_date": transaction_date,
+            "idempotency_key": tool_call_id,
+        })
+
+    return approved_add_transaction
 
 def build_graph(model, checkpointer, tools):
-    model_with_tools = model.bind_tools(
-        tools,
-    )
+    execution_tools = []
 
-    tool_node = ToolNode(tools)
+    for original_tool in tools:
+        if original_tool.name == "add_transaction":
+            execution_tools.append(
+                make_transaction_tool(original_tool)
+            )
+        else:
+            execution_tools.append(original_tool)
+
+    model_with_tools = model.bind_tools(execution_tools)
+
+    tool_node = ToolNode(execution_tools)
 
     async def chatbot(state: MoneyMateState):
         response = await model_with_tools.ainvoke([

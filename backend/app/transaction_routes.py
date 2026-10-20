@@ -6,6 +6,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import Account, Transaction
@@ -33,16 +35,46 @@ class TransactionResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+def verify_existing(existing: Transaction, data: TransactionCreate,) -> Transaction:
+    if (
+        existing.account_id != data.account_id
+        or existing.transaction_type != data.transaction_type
+        or existing.amount != data.amount
+        or existing.category != data.category
+        or existing.description != data.description
+        or existing.transaction_date != data.transaction_date
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency key belongs to another transaction.",
+        )
+
+    return existing
 
 @router.post("/", response_model=TransactionResponse, status_code=201)
 def create_transaction(
     data: TransactionCreate,
     db: Session = Depends(get_db),
+    *,
+    idempotency_key: str | None = None,
 ):
+    if idempotency_key:
+        existing = db.scalar(
+            select(Transaction).where(
+                Transaction.idempotency_key == idempotency_key
+            )
+        )
+
+        if existing is not None:
+            return verify_existing(existing, data)
+
     account = db.get(Account, data.account_id)
 
     if account is None:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Account not found",
+        )
 
     transaction = Transaction(
         account_id=data.account_id,
@@ -51,13 +83,29 @@ def create_transaction(
         category=data.category,
         description=data.description,
         transaction_date=data.transaction_date,
+        idempotency_key=idempotency_key,
     )
 
-    db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
+    try:
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
+        return transaction
 
-    return transaction
+    except IntegrityError:
+        db.rollback()
+
+        if idempotency_key:
+            existing = db.scalar(
+                select(Transaction).where(
+                    Transaction.idempotency_key == idempotency_key
+                )
+            )
+
+            if existing is not None:
+                return verify_existing(existing, data)
+
+        raise
 
 
 @router.get("/", response_model=list[TransactionResponse])

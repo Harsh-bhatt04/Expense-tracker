@@ -12,6 +12,16 @@ from app import models
 from fastapi.middleware.cors import CORSMiddleware
 from app.ai.agent import agent_lifespan
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173",
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,7 +39,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        FRONTEND_URL,
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

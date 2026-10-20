@@ -89,21 +89,17 @@ def get_category_spending(
 # -------------------------------
 
 @mcp.tool()
+@mcp.tool()
 def add_transaction(
     account_id: int,
     transaction_type: Literal["expense", "income"],
     amount: str,
+    idempotency_key: str,
     category: str = "Other",
     description: str = "",
     transaction_date: str | None = None,
 ) -> dict:
-    """
-    Create an expense or income transaction.
-
-    Requires user approval in LangGraph before execution.
-    Amount must be positive.
-    Date format: YYYY-MM-DD.
-    """
+    """Create an approved expense or income transaction."""
 
     try:
         data = TransactionCreate(
@@ -123,6 +119,7 @@ def add_transaction(
             transaction = create_transaction(
                 data=data,
                 db=db,
+                idempotency_key=idempotency_key,
             )
 
             return {
@@ -139,16 +136,10 @@ def add_transaction(
             }
 
     except (ValidationError, ValueError, InvalidOperation) as exc:
-        return {
-            "success": False,
-            "error": str(exc),
-        }
+        return {"success": False, "error": str(exc)}
 
     except HTTPException as exc:
-        return {
-            "success": False,
-            "error": str(exc.detail),
-        }
+        return {"success": False, "error": str(exc.detail)}
 
 
 # -------------------------------

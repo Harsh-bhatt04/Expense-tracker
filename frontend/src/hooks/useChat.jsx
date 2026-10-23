@@ -5,8 +5,10 @@ import {
   resumeChat,
   getChatHistory
 } from '../services/chatService'
+import { useAuth } from '../context/AuthContext'
 
 export default function useChat() {
+  const { authenticated, checking } = useAuth()
   const [conversationId, setConversationId] = useState(() => {
   const savedId = localStorage.getItem("moneymate_conversation_id");
 
@@ -30,6 +32,7 @@ export default function useChat() {
 
   async function restoreHistory() {
     try {
+      if (checking || !authenticated) return
       const data = await getChatHistory(conversationId);
 
       if (cancelled) return;
@@ -58,7 +61,7 @@ export default function useChat() {
   return () => {
     cancelled = true;
   };
-}, [conversationId]);
+}, [conversationId, authenticated, checking]);
 
   const appendAssistant = (content) => {
     setMessages((previous) => [

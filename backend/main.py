@@ -11,6 +11,8 @@ from app.chat_routes.chat import router as chat_router
 from app import models
 from fastapi.middleware.cors import CORSMiddleware
 from app.ai.agent import agent_lifespan
+from fastapi import Depends
+from app.auth import router as auth_router, require_session
 
 import os
 from dotenv import load_dotenv
@@ -48,12 +50,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(accounts_router)
-app.include_router(transactions_router)
-app.include_router(summary_router)
-app.include_router(transfers_router)
-app.include_router(chat_router)
+app.include_router(auth_router)
 
+protected = [Depends(require_session)]
+
+app.include_router(accounts_router, dependencies=protected)
+app.include_router(transactions_router, dependencies=protected)
+app.include_router(summary_router, dependencies=protected)
+app.include_router(transfers_router, dependencies=protected)
+app.include_router(chat_router, dependencies=protected)
 
 @app.get("/")
 def home():

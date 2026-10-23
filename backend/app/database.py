@@ -23,8 +23,12 @@ connect_args = (
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args=connect_args,
     pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=5,
+    pool_timeout=10,
+    connect_args={"connect_timeout": 10},
 )
 
 SessionLocal = sessionmaker(

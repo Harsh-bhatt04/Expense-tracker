@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://moneymate-backend-4jwh.onrender.com/:path*"
+    }
+  ]
+}

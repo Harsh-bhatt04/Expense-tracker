@@ -22,15 +22,19 @@ async def agent_lifespan():
     checkpoint_url = os.environ["CHECKPOINT_DATABASE_URL"]
 
     client = MultiServerMCPClient(
-        {
-            "money": {
-                "transport": "stdio",
-                "command": sys.executable,
-                "args": ["-m", "app.mcp_server.server"],
-                "cwd": str(BASE_DIR),
-            }
+    {
+        "money": {
+            "transport": "stdio",
+            "command": sys.executable,
+            "args": ["-m", "app.mcp_server.server"],
+            "cwd": str(BASE_DIR),
+            "env": {
+                **os.environ,
+                "DATABASE_URL": os.environ["DATABASE_URL"],
+            },
         }
-    )
+    }
+)
 
     async with AsyncPostgresSaver.from_conn_string(
         checkpoint_url
